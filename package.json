@@ -1,0 +1,37 @@
+{
+  "name": "square-embrace-web",
+  "version": "1.0.0",
+  "description": "A demo about authentication using jwt",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/belteshazzar/square-embrace-web.git"
+  },
+  "keywords": [
+    "jwt",
+    "node",
+    "authentication"
+  ],
+  "author": "Daniel Walton",
+  "license": "BSD-2",
+  "bugs": {
+    "url": "https://github.com/belteshazzar/square-embrace-web/issues"
+  },
+  "homepage": "https://github.com/belteshazzar/square-embrace-web#readme",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^10.0.0",
+    "express": "^4.17.1",
+    "jsonwebtoken": "^8.5.1",
+    "mongoose": "^5.12.10"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.7"
+  }
+}
