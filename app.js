@@ -23,45 +23,46 @@ app.post("/register", async (req, res) => {
 
     // Validate user input
     if (!(email && password && username)) {
-      res.status(400).send("All input is required");
+      // bad request
+      res.status(400).send("All input is required")
+      return
     }
 
     // check if user already exist
     // Validate if user exist in our database
-    const oldUser = await User.findOne({ username });
+    const existingUser = await User.findOne({ username });
 
-    if (oldUser) {
-      return res.status(409).send("User Already Exist. Please Login");
+    if (existingUser) {
+      // conflict
+      res.status(409).send("User Already Exist. Please Login");
+      return
     }
-
-    //Encrypt user password
-    const encryptedPassword = await bcrypt.hash(password, 10);
 
     // Create user in our database
     const user = await User.create({
       username: username.toLowerCase(),
-      email: email.toLowerCase(), // sanitize: convert email to lowercase
-      password: encryptedPassword,
+      email: email.toLowerCase(),
+      password: await bcrypt.hash(password, 10),
     });
 
-    // Create token
-    const token = jwt.sign(
-      { user_id: user._id, email },
-      process.env.TOKEN_KEY,
-      {
-        expiresIn: "2h",
-      }
-    );
-    // save user token
-    user.token = token;
-
     // return new user
-    res.status(201).json({ username: user.username, token: user.token });
+    // created
+    res.status(201).json({ username: user.username });
   } catch (err) {
     console.log(err);
-    res.status(500).send('something went wrong')
+    // server error
+    res.status(500).send('oops, something went wrong')
   }
 });
+
+// accessTokens
+function generateAccessToken(payload) {
+  return jwt.sign(payload, process.env.ACCESS_TOKEN_SECRET, {expiresIn: "15m"}) 
+}
+
+function generateRefreshToken(payload) {
+  return jwt.sign(payload, process.env.REFRESH_TOKEN_SECRET, {expiresIn: "20m"})
+}
 
 app.post("/login", async (req, res) => {
   try {
@@ -70,33 +71,71 @@ app.post("/login", async (req, res) => {
 
     // Validate user input
     if (!(username && password)) {
-      return res.status(400).send("All input is required");
+      // bad request
+      res.status(400).send("All input is required");
+      return
     }
+
     // Validate if user exist in our database
     const user = await User.findOne({ username });
 
-    if (user && (await bcrypt.compare(password, user.password))) {
-      // Create token
-      const token = jwt.sign(
-        { user_id: user._id, email: user.email },
-        process.env.TOKEN_KEY,
-        {
-          expiresIn: "2h",
-        }
-      );
-
-      // save user token
-      user.token = token;
-
-      // user
-      return res.status(200).json({username: user.username, token: user.token });
+    if (!user) {
+      // BAD REQUEST
+      res.status(400).send("invalid credentials");
+      return
     }
-    res.status(400).send("Invalid Credentials");
+
+    if (!( await bcrypt.compare(password, user.password))) {
+      // BAD REQUEST
+      res.status(400).send("invalid credentials");
+      return
+    }
+
+    const accessToken = generateAccessToken ({username: username, access: 'read write'})
+    const refreshToken = generateRefreshToken ({username: username})
+
+    res.status(200).json({username: user.username, accessToken: accessToken, refreshToken: refreshToken });
+
   } catch (err) {
     console.log(err);
     res.status(500).send('something went wrong')
   }
 });
+
+app.post("/refresh", (req,res) => {
+
+    // virtually the same case as in auth.js
+    // and allows indefinate refresh
+
+    let token
+
+    if (req.headers['authorization']) {
+      let ss = req.headers['authorization'].split(' ')
+      if (ss.length==2 && ss[0]=='Bearer') {
+        token = ss[1]
+      }
+    } else {
+      token = req.body.token || req.query.token;
+    }
+  
+    if (!token) {
+      return res.status(403).send("A token is required for authentication");
+    }
+  
+    try {
+      const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+      const accessToken = generateAccessToken ({username: decoded.username, acces: decoded.access})
+      const refreshToken = generateRefreshToken ({username: decoded.username})
+      res.json ({accessToken: accessToken, refreshToken: refreshToken})
+    } catch (err) {
+      return res.status(401).send("Invalid Token");
+    }
+})
+
+app.delete("/logout", (req,res)=>{
+  // TODO: invalidate refresh token
+  res.status(204).send("Logged out!")
+})
 
 app.get("/welcome", auth, (req, res) => {
   console.log(req.user)
